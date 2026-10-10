@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Citas</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#111;color:#eee;min-height:100vh}
+.wrap{max-width:900px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:20px;margin-bottom:4px} p.sub{color:#999;font-size:13px;margin-bottom:16px}
+.login{display:flex;gap:8px;margin-bottom:18px}
+.login input{flex:1;background:#1c1c1f;border:1px solid #333;color:#eee;border-radius:8px;padding:11px}
+.btn{background:#d8b45a;color:#141414;border:none;border-radius:8px;padding:11px 18px;font-weight:700;cursor:pointer}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #26262b;vertical-align:top}
+th{color:#999;font-weight:600;font-size:12px;text-transform:uppercase}
+tr.cancelled td{opacity:.4}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.confirmed{background:#123a22;color:#7fe0a0}
+.pending_payment{background:#3a2f10;color:#d8b45a}
+.cancelled{background:#3a1414;color:#ff9a9a}
+.cx{background:#2a2a30;color:#eee;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px}
+.err{color:#ff9a9a;margin-bottom:10px}
+.filters{display:none;gap:8px;margin-bottom:14px;align-items:center}
+.filters select{background:#1c1c1f;border:1px solid #333;color:#eee;border-radius:8px;padding:10px}
+.filters label{color:#999;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1 id="t">Citas</h1><p class="sub" id="sub"></p><p style="display:inline-block;background:#d8b45a;color:#141414;font-size:11px;font-weight:700;border-radius:6px;padding:3px 10px;margin-bottom:12px;">VERSIÓN DE PRUEBA</p>
+<div class="login"><input id="tok" type="password" placeholder="Token de admin"><button class="btn" onclick="load()">Entrar</button></div>
+<div class="err" id="err"></div>
+<div class="filters" id="filters"><label>Ver citas de:</label><select id="staffSel" onchange="renderRows()"><option value="">Todos</option></select></div>
+<table id="tbl" style="display:none"><thead><tr>
+<th>Fecha/hora</th><th>Cliente</th><th>Servicio</th><th>Barbero</th><th>Pago</th><th>Estado</th><th></th>
+</tr></thead><tbody id="rows"></tbody></table>
+</div>
+<script>
+const CFG={"name": "Willi Barbershop", "timezone": "America/New_York", "staff": [{"id": "barbero-1", "name": "Barbero 1"}, {"id": "barbero-2", "name": "Barbero 2"}]};
+let ALL=[{"id": "A1B2C3", "serviceName": "Fade", "servicePrice": 30, "staffId": "barbero-1", "staffName": "Barbero 1", "startMs": 1791640800000, "customer": {"name": "Carlos M\u00e9ndez", "phone": "+1 (786) 555-0111"}, "payment": {"method": "square", "status": "paid"}, "status": "confirmed"}, {"id": "D4E5F6", "serviceName": "Corte + Barba", "servicePrice": 40, "staffId": "barbero-2", "staffName": "Barbero 2", "startMs": 1791646200000, "customer": {"name": "Juan P\u00e9rez", "phone": "+1 (786) 555-0222"}, "payment": {"method": "stripe", "status": "paid"}, "status": "confirmed"}, {"id": "G7H8I9", "serviceName": "Arreglo de barba", "servicePrice": 20, "staffId": "barbero-1", "staffName": "Barbero 1", "startMs": 1791655200000, "customer": {"name": "Luis Torres", "phone": "+1 (786) 555-0333"}, "payment": {"method": "manual", "status": "pay_at_shop"}, "status": "confirmed"}, {"id": "J1K2L3", "serviceName": "Navaja cl\u00e1sica", "servicePrice": 30, "staffId": "barbero-2", "staffName": "Barbero 2", "startMs": 1791725400000, "customer": {"name": "Pedro S\u00e1nchez", "phone": "+1 (786) 555-0444"}, "payment": {"method": "mock", "status": "paid_demo"}, "status": "pending_payment"}, {"id": "M4N5O6", "serviceName": "Corte de ni\u00f1o", "servicePrice": 25, "staffId": "barbero-1", "staffName": "Barbero 1", "startMs": 1791576000000, "customer": {"name": "Mar\u00eda Gonz\u00e1lez", "phone": "+1 (786) 555-0555"}, "payment": {"method": "square", "status": "paid"}, "status": "cancelled"}];
+function load(){
+  document.getElementById('t').textContent='Citas \u2014 '+CFG.name;
+  const sel=document.getElementById('staffSel');
+  sel.innerHTML='<option value="">Todos</option>'+CFG.staff.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('');
+  document.getElementById('filters').style.display='flex';
+  document.getElementById('tbl').style.display='table';
+  document.querySelector('.login').style.display='none';
+  renderRows();
+}
+function renderRows(){
+  const f=document.getElementById('staffSel').value;
+  const tb=document.getElementById('rows'); tb.innerHTML='';
+  const list=ALL.filter(b=>!f||b.staffId===f);
+  list.forEach(b=>{
+    const dt=new Date(b.startMs);
+    const f=new Intl.DateTimeFormat('es-US',{timeZone:CFG.timezone,day:'2-digit',month:'short',hour:'numeric',minute:'2-digit',hour12:true}).format(dt);
+    const tr=document.createElement('tr'); if(b.status==='cancelled')tr.className='cancelled';
+    const payLbl={square:'Square',stripe:'Stripe',mock:'Demo',manual:'En el local'}[b.payment.method]||b.payment.method;
+    const stLbl=b.status==='confirmed'?'confirmada':b.status==='cancelled'?'cancelada':'pendiente';
+    tr.innerHTML='<td>'+f+'</td><td><b>'+esc(b.customer.name)+'</b><br><span style="color:#999">'+esc(b.customer.phone)+'</span></td>'
+    +'<td>'+esc(b.serviceName)+'<br><span style="color:#d8b45a">$'+b.servicePrice+'</span></td>'
+    +'<td>'+esc(b.staffName)+'</td><td>'+payLbl+'<br><span style="color:#999">'+b.payment.status+'</span></td>'
+    +'<td><span class="badge '+b.status+'">'+stLbl+'</span></td>'
+    +'<td>'+(b.status!=='cancelled'?'<button class="cx" onclick="cancelB(\''+b.id+'\')">Cancelar</button>':'')+'</td>';
+    tb.appendChild(tr);
+  });
+  document.getElementById('sub').textContent=list.length+' citas';
+}
+function esc(s){return String(s||'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function cancelB(id){
+  if(!confirm('\u00bfCancelar esta cita?'))return;
+  const b=ALL.find(function(x){return x.id===id;}); if(b)b.status='cancelled';
+  renderRows();
+}
+load();
+</script>
+</body>
+</html>
